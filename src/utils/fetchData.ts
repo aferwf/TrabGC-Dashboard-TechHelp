@@ -18,6 +18,23 @@ export interface TicketData {
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1J3rxGubyBXMKfg2YPgNh-ajnhRNoBCft/export?format=csv';
 
+// Converte valores textuais de satisfação para numéricos
+const convertSatisfactionToNumber = (value: string): number => {
+  const normalized = value.trim().toLowerCase();
+  const satisfactionMap: Record<string, number> = {
+    'excelente': 5,
+    'muito bom': 5,
+    'ótimo': 5,
+    'bom': 4,
+    'médio': 3,
+    'regular': 2,
+    'ruim': 1,
+    'péssimo': 1,
+  };
+  
+  return satisfactionMap[normalized] || parseFloat(value) || 0;
+};
+
 export const fetchTicketsData = async (): Promise<TicketData[]> => {
   try {
     const response = await fetch(SHEET_URL);
@@ -28,21 +45,29 @@ export const fetchTicketsData = async (): Promise<TicketData[]> => {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-          const data = results.data.map((row: any) => ({
-            id: row['ID do Chamado'] || row['id'] || '',
-            dataAbertura: row['Data de Abertura'] || row['dataAbertura'] || '',
-            dataFechamento: row['Data de Fechamento'] || row['dataFechamento'] || '',
-            status: row['Status'] || row['status'] || '',
-            prioridade: row['Prioridade'] || row['prioridade'] || '',
-            motivo: row['Motivo'] || row['motivo'] || '',
-            solucao: row['Solução'] || row['solucao'] || '',
-            solicitante: row['Solicitante'] || row['solicitante'] || '',
-            agenteResponsavel: row['Agente Responsável'] || row['agenteResponsavel'] || '',
-            departamento: row['Departamento'] || row['departamento'] || '',
-            tma: parseFloat(row['TMA (minutos)'] || row['tma'] || '0'),
-            frt: parseFloat(row['FRT (minutos)'] || row['frt'] || '0'),
-            satisfacao: parseFloat(row['Satisfação do Cliente'] || row['satisfacao'] || '0'),
-          }));
+          const data = results.data.map((row: any) => {
+            const satisfacaoValue = row['Satisfação do Cliente'] || row['satisfacao'] || '0';
+            
+            return {
+              id: row['ID do Chamado'] || row['id'] || '',
+              dataAbertura: row['Data de Abertura'] || row['dataAbertura'] || '',
+              dataFechamento: row['Data de Fechamento'] || row['dataFechamento'] || '',
+              status: row['Status'] || row['status'] || '',
+              prioridade: row['Prioridade'] || row['prioridade'] || '',
+              motivo: row['Motivo'] || row['motivo'] || '',
+              solucao: row['Solução'] || row['solucao'] || '',
+              solicitante: row['Solicitante'] || row['solicitante'] || '',
+              agenteResponsavel: row['Agente Responsável'] || row['agenteResponsavel'] || '',
+              departamento: row['Departamento'] || row['departamento'] || '',
+              tma: parseFloat(row['TMA (minutos)'] || row['tma'] || '0'),
+              frt: parseFloat(row['FRT (minutos)'] || row['frt'] || '0'),
+              satisfacao: convertSatisfactionToNumber(satisfacaoValue),
+            };
+          });
+          
+          console.log('Dados carregados:', data.length, 'tickets');
+          console.log('Exemplo de satisfação:', data.slice(0, 3).map(d => ({ id: d.id, satisfacao: d.satisfacao })));
+          
           resolve(data as TicketData[]);
         },
         error: (error) => {
@@ -107,4 +132,32 @@ export const getTicketsByReason = (tickets: TicketData[]) => {
   return Object.entries(reasonCounts)
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
+};
+
+export const getSatisfactionMetrics = (tickets: TicketData[]) => {
+  const ticketsWithSatisfaction = tickets.filter(t => t.satisfacao > 0);
+  
+  if (ticketsWithSatisfaction.length === 0) {
+    return {
+      average: 0,
+      distribution: [],
+      total: 0,
+    };
+  }
+
+  const distribution = [
+    { name: 'Muito Satisfeito (5)', count: ticketsWithSatisfaction.filter(t => t.satisfacao === 5).length },
+    { name: 'Satisfeito (4)', count: ticketsWithSatisfaction.filter(t => t.satisfacao === 4).length },
+    { name: 'Neutro (3)', count: ticketsWithSatisfaction.filter(t => t.satisfacao === 3).length },
+    { name: 'Insatisfeito (2)', count: ticketsWithSatisfaction.filter(t => t.satisfacao === 2).length },
+    { name: 'Muito Insatisfeito (1)', count: ticketsWithSatisfaction.filter(t => t.satisfacao === 1).length },
+  ];
+
+  const average = ticketsWithSatisfaction.reduce((sum, t) => sum + t.satisfacao, 0) / ticketsWithSatisfaction.length;
+
+  return {
+    average: Math.round(average * 10) / 10,
+    distribution: distribution.filter(d => d.count > 0),
+    total: ticketsWithSatisfaction.length,
+  };
 };

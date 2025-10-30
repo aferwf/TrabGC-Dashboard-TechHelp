@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import KPICard from '@/components/KPICard';
 import BarChart from '@/components/BarChart';
 import PieChart from '@/components/PieChart';
+import SatisfactionChart from '@/components/SatisfactionChart';
 import DataTable from '@/components/DataTable';
 import Filters from '@/components/Filters';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -13,6 +14,7 @@ import {
   calculateKPIs,
   getAgentProductivity,
   getTicketsByReason,
+  getSatisfactionMetrics,
   TicketData,
 } from '@/utils/fetchData';
 
@@ -73,6 +75,7 @@ const Index = () => {
   const kpis = calculateKPIs(filteredTickets);
   const agentProductivity = getAgentProductivity(filteredTickets);
   const ticketsByReason = getTicketsByReason(filteredTickets);
+  const satisfactionMetrics = getSatisfactionMetrics(filteredTickets);
   const allAgents = tickets 
     ? [...new Set(tickets.map(t => t.agenteResponsavel))].filter(Boolean)
     : [];
@@ -132,6 +135,13 @@ const Index = () => {
             title="Distribuição por Motivo"
           />
         </div>
+
+        {/* Satisfaction Chart */}
+        <SatisfactionChart
+          data={satisfactionMetrics.distribution}
+          average={satisfactionMetrics.average}
+          total={satisfactionMetrics.total}
+        />
 
         {/* Data Table */}
         <DataTable tickets={filteredTickets} />
